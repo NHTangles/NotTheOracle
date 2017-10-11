@@ -45,12 +45,12 @@ import time     # for the indulgence of this bot's general time obsession
 import ast      # for conduct/achievement bitfields - not really used
 import os       # for check path exists (dumplogs), and chmod, and environ
 import stat     # for chmod mode bits
-#import re       # for hello, and other things.
 import urllib   # for dealing with NH4 variants' #&$#@ spaces in filenames.
-#import shelve   # for perstistent !tell messages
-#import random   # for !rng and friends
-#import glob     # for matchning in !whereis
+import json     # for trophies file
 
+
+# twitter - minimalist twitter api: http://mike.verdone.ca/twitter/
+# pip install twitter
 # set TWIT to false to prevent tweeting
 TWIT = True
 try:
@@ -64,9 +64,9 @@ TEST= False
 # fn
 HOST, PORT = "chat.us.freenode.net", 6697
 # Channels to log events only, not hourly reports
+# Will speak when spoken to on any of these
 EVENTCHANNELS = ["#hardfought"]
 # Channels to log everything to
-# I kinda think we need to go there.
 SPAMCHANNELS = ["#devnull_nethack"]
 
 # only spam active channels
@@ -74,14 +74,111 @@ ACT_THRESHOLD = 5
 
 NICK = "NotTheOracle\\dnt"
 if TEST:
-    EVENTCHANNELS = ["#bot-test"]
-    SPAMCHANNELS = ["#hfdev"]
+    EVENTCHANNELS = ["#hfdev"]
+    SPAMCHANNELS = []
     NICK = "NotTheOracle"
+    TWIT = False
 CHANNELS = EVENTCHANNELS + SPAMCHANNELS
 NOTIFY_PROXY = "Beholder" # just use Beholder's !tell for &notify
 FILEROOT="/opt/nethack/hardfought.org/"
 WEBROOT="https://www.hardfought.org/"
 LOGROOT="/var/www/hardfought.org/irclog.dn/"
+TROPHIES="trophies.json"
+# some lookup tables for formatting messages
+role = { "Arc": "Archeologist",
+         "Bar": "Barbarian",
+         "Cav": "Caveman",
+         "Hea": "Healer",
+         "Kni": "Knight",
+         "Mon": "Monk",
+         "Pri": "Priest",
+         "Ran": "Ranger",
+         "Rog": "Rogue",
+         "Sam": "Samurai",
+         "Tou": "Tourist",
+         "Val": "Valkyrie",
+         "Wiz": "Wizard"
+       }
+
+race = { "Dwa": "Dwarf",
+         "Elf": "Elf",
+         "Gno": "Gnome",
+         "Hum": "Human",
+         "Orc": "Orc"
+       } 
+
+align = { "Cha": "Chaotic",
+          "Law": "Lawful",
+          "Neu": "Neutral"
+        }
+
+gender = { "Mal": "Male",
+           "Fem": "Female"
+         }
+
+t_recognition = { 
+    # bells trophies first
+    "fullmonty_wbo" : "Full Monty (with bells on!)",
+    "grandslam_wbo" : "Grand Slam (with bells on!)",
+    "doubletop_wbo" : "Double Top (with bells on!)",
+    "hattrick_wbo"  : "Hat-Trick (with bells on!)",
+    "birdie_wbo"    : "Birdie (with bells on!)",
+    "doubletop"     : "Double Top",
+    "platinum"      : "Platinum Star",
+    "fullmonty"     : "Full Monty",
+    "birdie"        : "Birdie",
+    "grandslam"     : "Grand Slam",
+    "plastic"       : "Plastic Star",
+    "dilithium"     : "Dilithium Star",
+    "copper"        : "Copper Star",
+    "iron"          : "Iron Star",
+    "lead"          : "Lead Star",
+    "gold"          : "Gold Star",
+    "steel"         : "Steel Star",
+    "bronze"        : "Bronze Star",
+    "brass"         : "Brass Star",
+    "zinc"          : "Zinc Star",
+    "silver"        : "Silver Star",
+    "hattrick"      : "Hat Trick"
+}
+t_major = {
+    "bestinshow"    : "Best In Show",
+    "unique"        : "Most Unique Deaths",
+    "minscore"      : "Lowest Scored Ascension",
+    "maxscore"      : "Highest Scored Ascension (aka the Berry)",
+    "best13"        : "Grand Prize (Best of 13)",
+    "minrealtime"   : "Lowest RealTime ascension",
+    "mostascs"      : "Most Ascensions",
+    "extinct"       : "Basic Extinct",
+    "firstasc"      : "First Ascension",
+    "bestconduct"   : "Best Behaved Ascension",
+    "killionaire"   : "\"Who Wants to be a Killionaire?\"",
+    "mingametime"   : "Lowest Turn-count Ascension"
+}
+t_minor = {
+    "Arc" : "Highest Scored Archeologist",
+    "Bar" : "Highest Scored Barbarian",
+    "Cav" : "Highest Scored Caveman",
+    "Hea" : "Highest Scored Healer",
+    "Kni" : "Highest Scored Knight",
+    "Mon" : "Highest Scored Monk",
+    "Pri" : "Highest Scored Priest",
+    "Ran" : "Highest Scored Ranger",
+    "Rog" : "Highest Scored Rogue",
+    "Sam" : "Highest Scored Samurai",
+    "Tou" : "Highest Scored Tourist",
+    "Val" : "Highest Scored Valkyrie",
+    "Wiz" : "Highest Scored Wizard"
+}
+t_challenge = {
+    "pacman" : "Pac-Man",
+    "zapm"   : "ZapM",
+    "waldo"  : "Waldo",
+    "pool"   : "Pool",
+    "digdug" : "Dig-Dug",
+    "joust"  : "Joust",
+    "grue"   : "Grue"
+}
 
 def fromtimestamp_int(s):
     return datetime.fromtimestamp(int(s))
@@ -138,12 +235,11 @@ class DeathBotProtocol(irc.IRCClient):
     if TEST: password = "NotTHEPassword"
     if TWIT:
        try:
-           gibberish_that_makes_twitter_work = open(".twitter_oauth","r").read().strip().split("\n")
-           #gibberish_that_makes_twitter_work = open("/opt/NotTheOracle/.twitter_oauth","r").read().strip().split("\n")
+           #gibberish_that_makes_twitter_work = open(".twitter_oauth","r").read().strip().split("\n")
+           gibberish_that_makes_twitter_work = open("/opt/NotTheOracle/.twitter_oauth","r").read().strip().split("\n")
            twit = Twitter(auth=OAuth(*gibberish_that_makes_twitter_work))
        except:
            TWIT = False
-    
     
 #    sourceURL = "https://github.com/NHTangles/beholder"
     versionName = "NotOracle.py"
@@ -161,11 +257,12 @@ class DeathBotProtocol(irc.IRCClient):
     ttime = { "start": datetime(2017,11,01,00,00,00),
               "end"  : datetime(2017,12,01,00,00,00)
             }
-    servers = [ ("hardfought", "ssh nethack@hardfought.org", "US East"),
-                ("altorg    ", "ssh nethack@e6.alt.org    ", "NAO Sponsored - US West"),
-                ("hdf-eu    ", "coming soon               ", "EU (London)"),
-                ("hdf-au    ", "coming maybe :)           ", "AU (Sydney)"),
+    servers = [ ("hardfought", "ssh nethack@hardfought.org   ", "US East"),
+                ("altorg    ", "ssh nethack@e6.alt.org       ", "NAO Sponsored - US West"),
+                ("hdf-eu    ", "ssh nethack@eu.hardfought.org", "EU (London)"),
+                ("hdf-au    ", "coming maybe :)              ", "AU (Sydney)"),
               ]
+
     logday = time.strftime("%d")
     chanLog = {}
     chanLogName = {}
@@ -225,6 +322,8 @@ class DeathBotProtocol(irc.IRCClient):
         self.stats = {}
         self.initStats("hour")
         self.initStats("day")
+        # trophies...
+        self.trophies = {}
         # work out how much hour is left 
         nowtime = datetime.now()
         # add 1 hour, then subtract min, sec, usec to get exact time of next hour.
@@ -287,6 +386,11 @@ class DeathBotProtocol(irc.IRCClient):
         # in use when we signed on, but a 30-second looping call won't kill us
         self.looping_calls["nick"] = task.LoopingCall(self.nickCheck)
         self.looping_calls["nick"].start(30)
+        # 1 minute looping call for trophies.
+        self.looping_calls["trophy"] = task.LoopingCall(self.reportTrophies)
+        self.looping_calls["trophy"].start(60)
+        # Call it now to seed the trophy dict.
+        self.reportTrophies()
 
     
     def tweet(self, message):
@@ -330,6 +434,11 @@ class DeathBotProtocol(irc.IRCClient):
         if replyto in CHANNELS:
             self.log(replyto, "<" + self.nickname + "> " + message)
         self.msg(replyto, message)
+
+    def announce(self, message):
+        for c in CHANNELS:
+            self.msgLog(c, message)
+        self.tweet(message)
 
     # Similar wrapper for describe
     def describeLog(self, replyto, message):
@@ -398,6 +507,65 @@ class DeathBotProtocol(irc.IRCClient):
             if cd["countdown"] > timedelta(0):
                 return cd
         return cd
+
+    def listTrophies(self,tlist):
+        # take a list of trophy IDs and expand them to full names
+        # return a string of the list like "this, that, and the other thing"
+        rv = ''
+        for i,t in enumerate(tlist):
+            # this is a nasty way to find the trophy name in any category
+            tname = t_major.get(t,t_minor.get(t,t_recognition.get(t,t)))
+            # first item
+            if (i == 0):
+               rv = tname
+            # last item
+            elif (i == len(tlist)-1):
+               if (i > 1): rv += "," # oxford comma :P
+               rv += " and " + tname
+            # middle items
+            else:
+               rv += ", " + tname
+        return rv
+        
+    def reportTrophies(self):
+        try:
+            ntrophies = json.loads(open(TROPHIES).read())
+        except:
+            print "Failed to read trophies file: " + TROPHIES
+            return
+        if self.trophies == {}:
+            # bot probably restarted
+            self.trophies = ntrophies 
+            return
+        newplrtrophies = {}
+        firstasc = ''
+        for tr in t_major.keys():
+            if self.trophies[tr] != ntrophies[tr]:
+                # first ascension gets special treatment
+                if tr == "firstasc":
+                    firstasc = ntrophies[tr].encode("utf-8")
+                    print "first asc: " + firstasc
+                else:
+                    newplrtrophies[ntrophies[tr]] = newplrtrophies.get(ntrophies[tr],[]) + [tr]
+
+        for tr in t_minor.keys():
+            if self.trophies["minor"][tr] != ntrophies["minor"][tr]:
+                newplrtrophies[ntrophies["minor"][tr]] = newplrtrophies.get(ntrophies["minor"][tr],[]) + [tr]
+         
+        newrec = {}
+        for tr in t_recognition.keys():
+            for nm in ntrophies[tr]:
+                if not nm in self.trophies[tr]:
+                    newrec[nm] = newrec.get(nm,[]) + [tr]
+        self.trophies = ntrophies
+
+        print "first asc: " + firstasc
+        if firstasc:
+            self.announce("TROPHY: " + firstasc + " just bagged the first ascension!")
+        for plr in newplrtrophies.keys():
+            self.announce("TROPHY: " + plr.encode("utf-8") + " now holds the " + self.listTrophies(newplrtrophies[plr]))
+        for plr in newrec.keys():
+            self.announce("TROPHY: " + plr.encode("utf-8") + " just earned the " + self.listTrophies(newrec[plr]))
 
     # implement commands here
     def doPing(self, sender, replyto, msgwords):
@@ -617,15 +785,10 @@ class DeathBotProtocol(irc.IRCClient):
 
     # actually "challenge" log reporting
     def livelogReport(self, event):
-       print event
        actioned = { "accept": "accepted", "success": "completed", "ignore": "ignored" }
        event["acted"] = actioned[event["action"]]
-       yield ("CHALLENGE " + event["acted"].upper() + "! {player} {acted} the {challenge} challenge.".format(**event))
-
-    def connectionLost(self, reason=None):
-        if self.looping_calls is None: return
-        for call in self.looping_calls.itervalues():
-            call.stop()
+       event["chalname"] = t_challenge[event["challenge"]]
+       yield ("CHALLENGE " + event["acted"].upper() + "! {player} {acted} the {chalname} challenge.".format(**event))
 
     def logReport(self, filepath):
         with filepath.open("r") as handle:
@@ -644,6 +807,12 @@ class DeathBotProtocol(irc.IRCClient):
 #                        self.msg(fwd, line)
 
             self.logs_seek[filepath] = handle.tell()
+
+    def connectionLost(self, reason=None):
+        if self.looping_calls is None: return
+        for call in self.looping_calls.itervalues():
+            call.stop()
+
 
 if __name__ == "__builtin__":
     f = protocol.ReconnectingClientFactory()
