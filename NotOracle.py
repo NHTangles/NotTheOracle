@@ -229,14 +229,14 @@ class DeathBotProtocol(irc.IRCClient):
     realname = "/dev/null/tribute"
     admin = ["K2", "Tangles" ]  # for &notify
     try:
-        password = open("/opt/NotTheOracle/pw", "r").read().strip() # We're not registering this with nickserv anyway
+        password = open("/opt/NotOracle/pw", "r").read().strip() # We're not registering this with nickserv anyway
     except:
         pass
     if TEST: password = "NotTHEPassword"
     if TWIT:
        try:
            #gibberish_that_makes_twitter_work = open(".twitter_oauth","r").read().strip().split("\n")
-           gibberish_that_makes_twitter_work = open("/opt/NotTheOracle/.twitter_oauth","r").read().strip().split("\n")
+           gibberish_that_makes_twitter_work = open("/opt/NotOracle/.twitter_oauth","r").read().strip().split("\n")
            twit = Twitter(auth=OAuth(*gibberish_that_makes_twitter_work))
        except:
            TWIT = False
@@ -248,7 +248,7 @@ class DeathBotProtocol(irc.IRCClient):
     dump_url_prefix = "https://" # WEBROOT + "userdata/{name[0]}/{name}/"
     dump_file_prefix = FILEROOT + "dgldir/userdata/{name[0]}/{name}/"
     
-    scoresURL = "https://www.hardfought.org/___coming_soon___"
+    scoresURL = "https://www.hardfought.org/devnull"
     if TEST: scoresURL = "https://voyager.lupomesky.cz/dnt/test.html"
 #    rceditURL = WEBROOT + "nethack/rcedit"
 #    helpURL = WEBROOT + "nethack"
@@ -278,10 +278,12 @@ class DeathBotProtocol(irc.IRCClient):
 
     # This will need some work.  Dumplog paths for remote servers.
     # something else will have to retrieve the xlogfiles and place them locally
-    xlogfiles = {filepath.FilePath(FILEROOT+"devnull36/var/xlogfile"): ("hardfought", "\t",
+    xlogfiles = {filepath.FilePath("/var/www/hardfought.org/devnull/xlogfiles/xlogfile"): ("hardfought", "\t",
                                             "www.hardfought.org/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt"),
-                 filepath.FilePath(FILEROOT+"devnull36/var/xlogfile.slashem"): ("slashem", "\t",
-                                            "em.slashem.me/userdata/{name}/dn36/dumplog/{starttime}.dn36.txt")}
+                 filepath.FilePath("/var/www/hardfought.org/devnull/xlogfiles/xlogfile-us-west"): ("altorg", "\t",
+                                            "http://54.183.3.254/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt"),
+                 filepath.FilePath("/var/www/hardfought.org/devnull/xlogfiles/xlogfile-eu"): ("hdf-eu", "\t",
+                                            "http://35.176.184.65/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt")}
     # livelogs is actually just the challenge log at this point.
     livelogs  = {filepath.FilePath("/var/www/hardfought.org/challenge/dn36_log"): ("", ":")}
 
@@ -421,9 +423,9 @@ class DeathBotProtocol(irc.IRCClient):
         if not self.chanLog[channel]: return
         # strip the colour control stuff out
         # This can probably all be done with a single RE but I have a headache.
-        message = re.sub(r'\x03\d\d,\d\d', '', message) # fg,bg pair
-        message = re.sub(r'\x03\d\d', '', message) # fg only
-        message = re.sub(r'[\x03\x0f]', '', message) # end of colour
+        # message = re.sub(r'\x03\d\d,\d\d', '', message) # fg,bg pair
+        # message = re.sub(r'\x03\d\d', '', message) # fg only
+        # message = re.sub(r'[\x03\x0f]', '', message) # end of colour
         if time.strftime("%d") != self.logday: self.logRotate()
         self.chanLog[channel].write(time.strftime("%H:%M ") + message + "\n")
         self.chanLog[channel].flush()
