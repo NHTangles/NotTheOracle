@@ -781,7 +781,7 @@ class DeathBotProtocol(irc.IRCClient):
             END = game["death"].upper()
         else: END = "DIED"
         yield (END + ": {name} ({role}-{race}-{gender}-{align}), "
-                   "{points} points, {death}{ascsuff}").format(**game)
+                   "{points} points, {death} on {server}{ascsuff}").format(**game)
 
     # actually "challenge" log reporting
     def livelogReport(self, event):
