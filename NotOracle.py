@@ -561,7 +561,6 @@ class DeathBotProtocol(irc.IRCClient):
                     newrec[nm] = newrec.get(nm,[]) + [tr]
         self.trophies = ntrophies
 
-        print "first asc: " + firstasc
         if firstasc:
             self.announce("TROPHY: " + firstasc + " just bagged the first ascension!")
         for plr in newplrtrophies.keys():
@@ -802,11 +801,7 @@ class DeathBotProtocol(irc.IRCClient):
                 if self.logs[filepath][1]: game["server"] = self.logs[filepath][1]
                 if self.logs[filepath][3]: game["dumpfmt"] = self.logs[filepath][3]
                 for line in self.logs[filepath][0](game):
-                    for c in CHANNELS: self.msgLog(c, line)
-                    # Announce on twitter!!
-                    self.tweet(line)
-#                    for fwd in self.forwards[game["variant"]]:
-#                        self.msg(fwd, line)
+                    self.announce(line)
 
             self.logs_seek[filepath] = handle.tell()
 
