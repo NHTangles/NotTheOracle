@@ -47,6 +47,7 @@ import os       # for check path exists (dumplogs), and chmod, and environ
 import stat     # for chmod mode bits
 import urllib   # for dealing with NH4 variants' #&$#@ spaces in filenames.
 import json     # for trophies file
+import random
 
 
 # twitter - minimalist twitter api: http://mike.verdone.ca/twitter/
@@ -74,9 +75,9 @@ ACT_THRESHOLD = 5
 
 NICK = "NotTheOracle\\dnt"
 if TEST:
-    EVENTCHANNELS = ["#hfdev"]
-    SPAMCHANNELS = []
-    NICK = "NotTheOracle"
+    EVENTCHANNELS = []
+    SPAMCHANNELS = ["#hfdev"]
+    NICK = "NotTheOracle\\tst"
     TWIT = False
 CHANNELS = EVENTCHANNELS + SPAMCHANNELS
 NOTIFY_PROXY = "Beholder" # just use Beholder's !tell for &notify
@@ -84,6 +85,7 @@ FILEROOT="/opt/nethack/hardfought.org/"
 WEBROOT="https://www.hardfought.org/"
 LOGROOT="/var/www/hardfought.org/irclog.dn/"
 TROPHIES="/opt/NotOracle/trophies.json"
+if TEST: TROPHIES="trophies.json"
 # some lookup tables for formatting messages
 role = { "Arc": "Archeologist",
          "Bar": "Barbarian",
@@ -227,6 +229,7 @@ class DeathBotProtocol(irc.IRCClient):
     nickname = NICK
     username = "NotTheOracle"
     realname = "/dev/null/tribute"
+    lineRate = 0.5
     admin = ["K2", "Tangles" ]  # for &notify
     try:
         password = open("/opt/NotOracle/pw", "r").read().strip() # We're not registering this with nickserv anyway
@@ -249,7 +252,7 @@ class DeathBotProtocol(irc.IRCClient):
     dump_file_prefix = FILEROOT + "dgldir/userdata/{name[0]}/{name}/"
     
     scoresURL = "https://www.hardfought.org/devnull"
-    if TEST: scoresURL = "https://voyager.lupomesky.cz/dnt/test.html"
+#    if TEST: scoresURL = "https://voyager.lupomesky.cz/dnt/test.html"
 #    rceditURL = WEBROOT + "nethack/rcedit"
 #    helpURL = WEBROOT + "nethack"
     # devnull tournament runs on hollywood time
@@ -283,9 +286,19 @@ class DeathBotProtocol(irc.IRCClient):
                  filepath.FilePath("/var/www/hardfought.org/devnull/xlogfiles/xlogfile-us-west"): ("altorg", "\t",
                                             "http://54.183.3.254/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt"),
                  filepath.FilePath("/var/www/hardfought.org/devnull/xlogfiles/xlogfile-eu"): ("hdf-eu", "\t",
-                                            "http://35.176.184.65/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt")}
+                                            "https://eu.hardfought.org/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt")}
     # livelogs is actually just the challenge log at this point.
     livelogs  = {filepath.FilePath("/var/www/hardfought.org/challenge/dn36_log"): ("", ":")}
+
+    if TEST:
+        xlogfiles = {filepath.FilePath("xlogfile.hdf"): ("hardfought", "\t",
+                                            "www.hardfought.org/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt"),
+                 filepath.FilePath("xlogfile.nao"): ("altorg", "\t",
+                                            "http://54.183.3.254/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt"),
+                 filepath.FilePath("xlogfile.eu"): ("hdf-eu", "\t",
+                                            "https://eu.hardfought.org/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt")}
+        # livelogs is actually just the challenge log at this point.
+        livelogs  = {filepath.FilePath("dn36_log"): ("", ":")}
 
     # Forward events to other bots at the request of maintainers of other variant-specific channels
     #forwards = {"hardfought" : [],
@@ -460,6 +473,8 @@ class DeathBotProtocol(irc.IRCClient):
 
     # Hourly/daily stats 
     def spamStats(self,period):
+        # if no games were played, don't report anything.
+        if self.stats[period]["games"] == 0: return
         # formatting awkwardness
         stat1str = { "turns"  : " turns were played in games that ended.",
                      "points" : " points were scored in games that ended.",
@@ -478,15 +493,16 @@ class DeathBotProtocol(irc.IRCClient):
     def hourlyStats(self):
         nowtime = datetime.now()
         game_on =  (nowtime > self.ttime["start"]) and (nowtime < self.ttime["end"])
+        if TEST: game_on = True
+        if not game_on: return
         for c in SPAMCHANNELS:
             # only spam channels if other people are have been talking here
             # Don't be a Nigel. We're cooler than that.
             if self.activity[c] > ACT_THRESHOLD or game_on: 
                 self.doTime("",c,"")
                 self.activity[c] = 0
-        if not game_on: return
 
-        if now.hour == 0:
+        if nowtime.hour == 0:
             self.spamStats("day")
             self.initStats("day")
         else:
@@ -782,13 +798,13 @@ class DeathBotProtocol(irc.IRCClient):
             END = game["death"].upper()
         else: END = "DIED"
         yield (END + ": {name} ({role}-{race}-{gender}-{align}), "
-                   "{points} points, {death} on {server}{ascsuff}").format(**game)
+                   "{points} points, {turns} turns, {death} on {server}{ascsuff}").format(**game)
 
     # actually "challenge" log reporting
     def livelogReport(self, event):
        actioned = { "accept": "accepted", "success": "completed", "ignore": "ignored" }
        event["acted"] = actioned[event["action"]]
-       event["chalname"] = t_challenge[event["challenge"]]
+       event["chalname"] = t_challenge[event["challenge"].lower()]
        yield ("CHALLENGE " + event["acted"].upper() + "! {player} {acted} the {chalname} challenge.".format(**event))
 
     def logReport(self, filepath):
