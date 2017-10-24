@@ -3,7 +3,7 @@ NotOracle.py - a reporting bot for the /dev/null/tribute
 NetHack tournament.
 Copyright (c) 2017, A. Thomson
 
-Concept based on the "oracle\devnull" bot of 
+Concept based on the "oracle\devnull" bot of
 #devnull_nethack 1999(?)-2016
 Code based on Beholder of #hardfought - A.Thomson, K.Simpson.
 
@@ -59,6 +59,8 @@ try:
 except:
     TWIT = False
 
+YEAR="2017" # Just in case we use this thing again
+
 TEST= False
 #TEST = True  # uncomment for testing
 
@@ -107,7 +109,7 @@ race = { "Dwa": "Dwarf",
          "Gno": "Gnome",
          "Hum": "Human",
          "Orc": "Orc"
-       } 
+       }
 
 align = { "Cha": "Chaotic",
           "Law": "Lawful",
@@ -118,7 +120,7 @@ gender = { "Mal": "Male",
            "Fem": "Female"
          }
 
-t_recognition = { 
+t_recognition = {
     # bells trophies first
     "fullmonty_wbo" : "Full Monty (with bells on!)",
     "grandslam_wbo" : "Grand Slam (with bells on!)",
@@ -243,14 +245,14 @@ class DeathBotProtocol(irc.IRCClient):
            twit = Twitter(auth=OAuth(*gibberish_that_makes_twitter_work))
        except:
            TWIT = False
-    
+
 #    sourceURL = "https://github.com/NHTangles/beholder"
     versionName = "NotOracle.py"
     versionNum = "0.1"
 
     dump_url_prefix = "https://" # WEBROOT + "userdata/{name[0]}/{name}/"
     dump_file_prefix = FILEROOT + "dgldir/userdata/{name[0]}/{name}/"
-    
+
     scoresURL = "https://www.hardfought.org/devnull"
 #    if TEST: scoresURL = "https://voyager.lupomesky.cz/dnt/test.html"
 #    rceditURL = WEBROOT + "nethack/rcedit"
@@ -302,14 +304,14 @@ class DeathBotProtocol(irc.IRCClient):
 
     # Forward events to other bots at the request of maintainers of other variant-specific channels
     #forwards = {"hardfought" : [],
-    #            "slashem" : []} 
+    #            "slashem" : []}
     # Stats for hourly/daily spam
 
     looping_calls = None
     commands = {}
 
     def initStats(self, statset):
-        self.stats[statset] = { "race"   : {}, 
+        self.stats[statset] = { "race"   : {},
                                 "role"   : {},
                                 "gender" : {},
                                 "align"  : {},
@@ -339,7 +341,7 @@ class DeathBotProtocol(irc.IRCClient):
         self.initStats("day")
         # trophies...
         self.trophies = {}
-        # work out how much hour is left 
+        # work out how much hour is left
         nowtime = datetime.now()
         # add 1 hour, then subtract min, sec, usec to get exact time of next hour.
         nexthour = nowtime + timedelta(hours=1)
@@ -365,6 +367,7 @@ class DeathBotProtocol(irc.IRCClient):
         self.commands = { "ping"     : self.doPing,
                           "time"     : self.doTime,
                           "notify"   : self.takeMessage,
+                          "news"     : self.doNews,
                           "lastgame" : self.lastGame,
                           "lastasc"  : self.lastAsc,
                           "scores"   : self.doScoreboard,
@@ -407,7 +410,7 @@ class DeathBotProtocol(irc.IRCClient):
         # Call it now to seed the trophy dict.
         self.reportTrophies()
 
-    
+
     def tweet(self, message):
         if TWIT: self.twit.statuses.update(status=message)
 
@@ -471,36 +474,47 @@ class DeathBotProtocol(irc.IRCClient):
 #            self.msgLog(replyto, sender + ": " + message)
             self.msgLog(replyto, message)
 
-    # Hourly/daily stats 
-    def spamStats(self,period):
+    # Hourly/daily/special stats
+    def spamStats(self,p):
+        period = p
+        if p == "news": period = "day"
         # if no games were played, don't report anything.
-        if self.stats[period]["games"] == 0: return
         # formatting awkwardness
-        stat1str = { "turns"  : " turns were played in games that ended.",
-                     "points" : " points were scored in games that ended.",
+        stat1str = { "turns"  : " turns were played.",
+                     "points" : " points were scored."
                    }
+        stat2str = { "align"  : "alignment" } # use get() to leave unchanged if not here
+        periodStr = { "hour" : ["It's %H o'clock on %A, %B %d (%Z), and this is your Hourly Update.", "In the last hour,"],
+                      "day"  : ["It's now %A, %B %d, and this is your Daily Wrap-up.", "Over the past day,"],
+                      "news" : ["It's %M minutes after %H o'clock on %A, %B %d (%Z), and this is a Special Bulletin.", "So far today,"]
+                    }
         # weighted randomness
         stat1 = random.choice(["turns", "points"])
         stat2 = random.choice(["role"] * 5 + ["race"] * 3 + ["align"] * 2 + ["gender"])
-        # Find whatever thing from the list above had the most games, and how many games it had
-        maxStat2 = dict(zip(["name","number"],max(self.stats[period][stat2].iteritems(), key=lambda x:x[1])))
+        if self.stats[period]["games"] != 0:
+            # Find whatever thing from the list above had the most games, and how many games it had
+            maxStat2 = dict(zip(["name","number"],max(self.stats[period][stat2].iteritems(), key=lambda x:x[1])))
+            # Expand the Rog->Rogue, Fem->Female, etc
+            maxStat2["name"] = dict(role.items() + race.items() + gender.items() + align.items()).get(maxStat2["name"],maxStat2["name"])
+        cd = self.countDown()
+        if cd["event"] == "start": cd["prep"] = "until"
+        else: cd["prep"] = "in"
         for c in SPAMCHANNELS:
-            self.msgLog(c, "In the last " + period + " {games} games ended, with {ascend} ascensions.".format(**self.stats[period]))
-            self.msgLog(c, str(self.stats[period][stat1]) + stat1str[stat1])
-            self.msgLog(c, "The most popular " + stat2 + " was {name} with {number} games.".format(**maxStat2))
-
+            self.msgLog(c, "Greetings, Adventurers!")
+            self.msgLog(c, time.strftime(periodStr[p][0]))
+            self.msgLog(c,  periodStr[p][1] + " {games} games ended, with {ascend} ascensions.".format(**self.stats[period]))
+            if self.stats[period]["games"] != 0:
+                self.msgLog(c, "In these games, " + str(self.stats[period][stat1]) + stat1str[stat1])
+                self.msgLog(c, "The most popular " + stat2str.get(stat2,stat2) + " was {name} with {number} games.".format(**maxStat2))
+            self.msgLog(c, "There are {days} days, {hours} hours and {minutes} minutes left {prep} the ".format(**cd)
+                               + YEAR + " Tournament")
+            self.msgLog(c, "Let's be careful out there.")
 
     def hourlyStats(self):
         nowtime = datetime.now()
         game_on =  (nowtime > self.ttime["start"]) and (nowtime < self.ttime["end"])
         if TEST: game_on = True
         if not game_on: return
-        for c in SPAMCHANNELS:
-            # only spam channels if other people are have been talking here
-            # Don't be a Nigel. We're cooler than that.
-            if self.activity[c] > ACT_THRESHOLD or game_on: 
-                self.doTime("",c,"")
-                self.activity[c] = 0
 
         if nowtime.hour == 0:
             self.spamStats("day")
@@ -521,8 +535,14 @@ class DeathBotProtocol(irc.IRCClient):
         for event in ("start", "end"):
             cd["event"] = event
             # add half a second for rounding (we truncate at the decimal later)
-            cd["countdown"] = (self.ttime[event] - datetime.now()) + timedelta(seconds=0.5)
-            if cd["countdown"] > timedelta(0):
+            td = (self.ttime[event] - datetime.now()) + timedelta(seconds=0.5)
+            sec = int(td.seconds)
+            cd["seconds"] = int(sec % 60)
+            cd["minutes"] = int((sec / 60) % 60)
+            cd["hours"] = int(sec / 3600)
+            cd["days"] = td.days
+            cd["countdown"] = td
+            if td > timedelta(0):
                 return cd
         return cd
 
@@ -544,7 +564,7 @@ class DeathBotProtocol(irc.IRCClient):
             else:
                rv += ", " + tname
         return rv
-        
+
     def reportTrophies(self):
         try:
             ntrophies = json.loads(open(TROPHIES).read())
@@ -553,7 +573,7 @@ class DeathBotProtocol(irc.IRCClient):
             return
         if self.trophies == {}:
             # bot probably restarted
-            self.trophies = ntrophies 
+            self.trophies = ntrophies
             return
         newplrtrophies = {}
         firstasc = ''
@@ -569,7 +589,7 @@ class DeathBotProtocol(irc.IRCClient):
         for tr in t_minor.keys():
             if self.trophies["minor"][tr] != ntrophies["minor"][tr]:
                 newplrtrophies[ntrophies["minor"][tr]] = newplrtrophies.get(ntrophies["minor"][tr],[]) + [tr]
-         
+
         newrec = {}
         for tr in t_recognition.keys():
             for nm in ntrophies[tr]:
@@ -589,14 +609,22 @@ class DeathBotProtocol(irc.IRCClient):
         self.respond(replyto, sender, "Pong! " + " ".join(msgwords[1:]))
 
     def doTime(self, sender, replyto, msgwords):
+
         self.respond(replyto, sender, time.strftime("The time is %H:%M:%S(%Z) on %A, %B %d, %Y"))
         timeLeft = self.countDown()
         if timeLeft["countdown"] <= timedelta(0):
-            self.respond(replyto, sender, "The tournament is OVER!")
-            return 
-        strcountdown = str(timeLeft["countdown"]).split(".")[0] # no microseconds
-        self.respond(replyto, sender, "The tournament {event}s in ".format(**timeLeft)
-                                      + strcountdown + ".")
+            self.msgLog(c, "The " + YEAR + " tournament is OVER!")
+            return
+        ev = { "start" : "begins",
+               "end" : "closes"
+             }
+
+        self.respond(replyto, sender, "The time remaining until the " + YEAR + " Tournament "
+                                      + ev[timeLeft["event"]] + " is '00-00-{days}:{hours}-{minutes}-{seconds}'".format(**timeLeft))
+
+
+    def doNews(self, sender, replyto, msgwords):
+        self.spamStats("news")
 
     def doScoreboard(self, sender, replyto, msgwords):
         self.respond(replyto, sender, "Please see " + self.scoresURL + " for the current standings.")
@@ -604,16 +632,17 @@ class DeathBotProtocol(irc.IRCClient):
     def doServers(self, sender, replyto, msgwords):
         for s in self.servers:
             self.respond(replyto,sender, " : ".join(s))
-        
+
     def doHelp(self, sender, replyto, msgwords):
         self.respond(replyto, sender, "&ping    - ping!\n"
                                     + "&time    - Get time remaining\n"
+                                    + "&news    - request a tournament news bulletin\n"
                                     + "&notify  - Send message to tournament staff\n"
                                     + "&lastgame/&lastasc - dumplogs from last game for player/server\n"
                                     + "&scores  - Link to scoreboard\n"
                                     + "&servers - List of servers where you can play\n"
                                     + "&help    - This help.")
-        
+
     def takeMessage(self, sender, replyto, msgwords):
         for a in self.admin:
             # make some other bot deal with the message
