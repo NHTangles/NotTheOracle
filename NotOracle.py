@@ -619,12 +619,13 @@ class DeathBotProtocol(irc.IRCClient):
         if timeLeft["countdown"] <= timedelta(0):
             self.msgLog(c, "The " + YEAR + " tournament is OVER!")
             return
-        ev = { "start" : "begins",
-               "end" : "closes"
-             }
+        verbs = { "start" : "begins",
+                  "end" : "closes"
+                }
 
         self.respond(replyto, sender, "The time remaining until the " + YEAR + " Tournament "
-                                      + ev[timeLeft["event"]] + " is '00-00-{days}:{hours}-{minutes}-{seconds}'".format(**timeLeft))
+                                      + verbs[timeLeft["event"]]
+                                      + " is '00-00-{days:0>2}:{hours:0>2}-{minutes:0>2}-{seconds:0>2}'".format(**timeLeft))
 
 
     def doNews(self, sender, replyto, msgwords):
