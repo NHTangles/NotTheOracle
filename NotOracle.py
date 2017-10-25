@@ -475,7 +475,7 @@ class DeathBotProtocol(irc.IRCClient):
             self.msgLog(replyto, message)
 
     # Hourly/daily/special stats
-    def spamStats(self,p):
+    def spamStats(self,p,replyto):
         period = p
         if p == "news": period = "day"
         # if no games were played, don't report anything.
@@ -499,7 +499,11 @@ class DeathBotProtocol(irc.IRCClient):
         cd = self.countDown()
         if cd["event"] == "start": cd["prep"] = "until"
         else: cd["prep"] = "in"
-        for c in SPAMCHANNELS:
+        if replyto:
+            chanlist = [replyto]
+        else:
+            chanlist = SPAMCHANNELS
+        for c in chanlist:
             self.msgLog(c, "Greetings, Adventurers!")
             self.msgLog(c, time.strftime(periodStr[p][0]))
             self.msgLog(c,  periodStr[p][1] + " {games} games ended, with {ascend} ascensions.".format(**self.stats[period]))
@@ -513,14 +517,14 @@ class DeathBotProtocol(irc.IRCClient):
     def hourlyStats(self):
         nowtime = datetime.now()
         game_on =  (nowtime > self.ttime["start"]) and (nowtime < self.ttime["end"])
-        if TEST: game_on = True
+        #if TEST: game_on = True
         if not game_on: return
 
         if nowtime.hour == 0:
-            self.spamStats("day")
+            self.spamStats("day",None)
             self.initStats("day")
         else:
-            self.spamStats("hour")
+            self.spamStats("hour",None)
         self.initStats("hour")
 
     def startHourly(self):
@@ -624,7 +628,7 @@ class DeathBotProtocol(irc.IRCClient):
 
 
     def doNews(self, sender, replyto, msgwords):
-        self.spamStats("news")
+        self.spamStats("news",replyto)
 
     def doScoreboard(self, sender, replyto, msgwords):
         self.respond(replyto, sender, "Please see " + self.scoresURL + " for the current standings.")
