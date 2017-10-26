@@ -86,7 +86,7 @@ NOTIFY_PROXY = "Beholder" # just use Beholder's !tell for &notify
 FILEROOT="/opt/nethack/hardfought.org/"
 WEBROOT="https://www.hardfought.org/"
 LOGROOT="/var/www/hardfought.org/irclog.dn/"
-TROPHIES="/opt/NotOracle/trophies.json"
+TROPHIES="/home/mandevil/trophies.json"
 if TEST: TROPHIES="trophies.json"
 # some lookup tables for formatting messages
 role = { "Arc": "Archeologist",
