@@ -198,7 +198,7 @@ def fixdump(s):
 
 xlogfile_parse = dict.fromkeys(
     ("points", "deathdnum", "deathlev", "maxlvl", "hp", "maxhp", "deaths",
-     "uid", "turns", "xplevel", "exp","depth","dnum","score","amulet"), int)
+     "uid", "turns", "xplevel", "exp","depth","dnum","score","amulet","realtime"), int)
 xlogfile_parse.update(dict.fromkeys(
     ("conduct", "event", "carried", "flags", "achieve"), ast.literal_eval))
 #xlogfile_parse["starttime"] = fromtimestamp_int
@@ -259,8 +259,8 @@ class DeathBotProtocol(irc.IRCClient):
 #    helpURL = WEBROOT + "nethack"
     # devnull tournament runs on hollywood time
     os.environ["TZ"] = ":US/Pacific"
-    ttime = { "start": datetime(2017,11,01,00,00,00),
-              "end"  : datetime(2017,12,01,00,00,00)
+    ttime = { "start": datetime(int(YEAR),11,01,00,00,00),
+              "end"  : datetime(int(YEAR),12,01,00,00,00)
             }
     servers = [ ("hardfought", "ssh nethack@hardfought.org   ", "US East"),
                 ("altorg    ", "ssh nethack@e6.alt.org       ", "NAO Sponsored - US West"),
@@ -311,14 +311,15 @@ class DeathBotProtocol(irc.IRCClient):
     commands = {}
 
     def initStats(self, statset):
-        self.stats[statset] = { "race"   : {},
-                                "role"   : {},
-                                "gender" : {},
-                                "align"  : {},
-                                "points" : 0,
-                                "turns"  : 0,
-                                "games"  : 0,
-                                "ascend" : 0
+        self.stats[statset] = { "race"    : {},
+                                "role"    : {},
+                                "gender"  : {},
+                                "align"   : {},
+                                "points"  : 0,
+                                "turns"   : 0,
+                                "realtime": 0,
+                                "games"   : 0,
+                                "ascend"  : 0
                               }
     def signedOn(self):
         self.factory.resetDelay()
@@ -480,22 +481,32 @@ class DeathBotProtocol(irc.IRCClient):
         if p == "news": period = "day"
         # if no games were played, don't report anything.
         # formatting awkwardness
-        stat1str = { "turns"  : " turns were played.",
-                     "points" : " points were scored."
-                   }
+        # do turns and points, or time.
+        stat1lst = [ "{turns} turns were played and {points} points were scored.",
+                      "{d} days, {h} hours, {m} minutes, and {s} seconds were spent playing NetHack." ]
         stat2str = { "align"  : "alignment" } # use get() to leave unchanged if not here
         periodStr = { "hour" : ["It's %H o'clock on %A, %B %d (%Z), and this is your Hourly Update.", "In the last hour,"],
                       "day"  : ["It's now %A, %B %d, and this is your Daily Wrap-up.", "Over the past day,"],
                       "news" : ["It's %M minutes after %H o'clock on %A, %B %d (%Z), and this is a Special Bulletin.", "So far today,"]
                     }
-        # weighted randomness
-        stat1 = random.choice(["turns", "points"])
-        stat2 = random.choice(["role"] * 5 + ["race"] * 3 + ["align"] * 2 + ["gender"])
+        # hourly, we report one of role/race/etc. Daily, and for news, we report them all
+        if p == "hour":
+            stat1lst = [random.choice(stat1lst)]
+            # weighted. role is more interesting than gender
+            stat2lst = [random.choice(["role"] * 5 + ["race"] * 3 + ["align"] * 2 + ["gender"])]
+        else:
+            stat2lst = ["role", "race", "align", "gender"]
         if self.stats[period]["games"] != 0:
-            # Find whatever thing from the list above had the most games, and how many games it had
-            maxStat2 = dict(zip(["name","number"],max(self.stats[period][stat2].iteritems(), key=lambda x:x[1])))
-            # Expand the Rog->Rogue, Fem->Female, etc
-            maxStat2["name"] = dict(role.items() + race.items() + gender.items() + align.items()).get(maxStat2["name"],maxStat2["name"])
+            # mash the realtime value into d,h,m,s
+            rt = int(self.stats[period]["realtime"])
+            self.stats[period]["s"] = int(rt%60)
+            rt /= 60
+            self.stats[period]["m"] = int(rt%60)
+            rt /= 60
+            self.stats[period]["h"] = int(rt%24)
+            rt /= 24
+            self.stats[period]["d"] = int(rt)
+
         cd = self.countDown()
         if cd["event"] == "start": cd["prep"] = "until"
         else: cd["prep"] = "in"
@@ -506,10 +517,16 @@ class DeathBotProtocol(irc.IRCClient):
         for c in chanlist:
             self.msgLog(c, "Greetings, Adventurers!")
             self.msgLog(c, time.strftime(periodStr[p][0]))
-            self.msgLog(c,  periodStr[p][1] + " {games} games ended, with {ascend} ascensions.".format(**self.stats[period]))
+            self.msgLog(c, periodStr[p][1] + " {games} games ended, with {ascend} ascensions.".format(**self.stats[period]))
             if self.stats[period]["games"] != 0:
-                self.msgLog(c, "In these games, " + str(self.stats[period][stat1]) + stat1str[stat1])
-                self.msgLog(c, "The most popular " + stat2str.get(stat2,stat2) + " was {name} with {number} games.".format(**maxStat2))
+                for stat1 in stat1lst:
+                    self.msgLog(c, stat1.format(**self.stats[period]))
+                for stat2 in stat2lst:
+                    # Find whatever thing from the list above had the most games, and how many games it had
+                    maxStat2 = dict(zip(["name","number"],max(self.stats[period][stat2].iteritems(), key=lambda x:x[1])))
+                    # Expand the Rog->Rogue, Fem->Female, etc
+                    maxStat2["name"] = dict(role.items() + race.items() + gender.items() + align.items()).get(maxStat2["name"],maxStat2["name"])
+                    self.msgLog(c, "The most popular " + stat2str.get(stat2,stat2) + " was {name} with {number} games.".format(**maxStat2))
             self.msgLog(c, "There are {days} days, {hours} hours and {minutes} minutes left {prep} the ".format(**cd)
                                + YEAR + " Tournament")
             self.msgLog(c, "Let's be careful out there.")
@@ -814,7 +831,7 @@ class DeathBotProtocol(irc.IRCClient):
         # collect hourly/daily stats for games that actually ended now(ish)
         for period in ["hour","day"]:
             self.stats[period]["games"] += 1
-            for tp in ["turns","points"]:
+            for tp in ["turns","points","realtime"]:
                 self.stats[period][tp] += game[tp]
             for rrga in ["role","race","gender","align"]:
                 self.stats[period][rrga][game[rrga]] = self.stats[period][rrga].get(game[rrga],0) + 1
