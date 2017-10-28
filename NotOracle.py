@@ -176,7 +176,7 @@ t_minor = {
 }
 t_challenge = {
     "pacman" : "Pac-Man",
-    "zapm"   : "ZapM",
+    "zapm"   : "ZAPM",
     "waldo"  : "Waldo",
     "pool"   : "Pool",
     "digdug" : "Dig-Dug",
@@ -231,7 +231,7 @@ class DeathBotProtocol(irc.IRCClient):
     nickname = NICK
     username = "NotTheOracle"
     realname = "/dev/null/tribute"
-    lineRate = 0.5
+    lineRate = 0.2
     admin = ["K2", "Tangles" ]  # for &notify
     try:
         password = open("/opt/NotOracle/pw", "r").read().strip() # We're not registering this with nickserv anyway
@@ -291,6 +291,11 @@ class DeathBotProtocol(irc.IRCClient):
                                             "https://eu.hardfought.org/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt")}
     # livelogs is actually just the challenge log at this point.
     livelogs  = {filepath.FilePath("/var/www/hardfought.org/challenge/dn36_log"): ("", ":")}
+    # ZAPM logfiles 
+    zlogfiles = [filepath.FilePath("/var/www/hardfought.org/challenge/zlogfile"),
+                 filepath.FilePath("/var/www/hardfought.org/challenge/zlogfile-eu"),
+                 filepath.FilePath("/var/www/hardfought.org/challenge/zlogfile-us-west")
+                ]
 
     if TEST:
         xlogfiles = {filepath.FilePath("xlogfile.hdf"): ("hardfought", "\t",
@@ -319,7 +324,9 @@ class DeathBotProtocol(irc.IRCClient):
                                 "turns"   : 0,
                                 "realtime": 0,
                                 "games"   : 0,
-                                "ascend"  : 0
+                                "ascend"  : 0,
+                                "zgames"  : 0,
+                                "zascend" : 0
                               }
     def signedOn(self):
         self.factory.resetDelay()
@@ -379,6 +386,12 @@ class DeathBotProtocol(irc.IRCClient):
 
         # seek to end of livelogs
         for filepath in self.livelogs:
+            with filepath.open("r") as handle:
+                handle.seek(0, 2)
+                self.logs_seek[filepath] = handle.tell()
+
+        # likewise zapm logs
+        for filepath in self.zlogfiles:
             with filepath.open("r") as handle:
                 handle.seek(0, 2)
                 self.logs_seek[filepath] = handle.tell()
@@ -475,20 +488,37 @@ class DeathBotProtocol(irc.IRCClient):
 #            self.msgLog(replyto, sender + ": " + message)
             self.msgLog(replyto, message)
 
+    def updateZapmStats(self):
+        for filepath in self.zlogfiles:
+            with filepath.open("r") as handle:
+                handle.seek(self.logs_seek[filepath])
+                for line in handle:
+                    print line
+                    for period in self.stats:
+                        if line.find("Activated the Bizarro Orgasmatron") != -1:
+                            self.stats[period]["zascend"] += 1
+                        self.stats[period]["zgames"] += 1
+                self.logs_seek[filepath] = handle.tell()
+
     # Hourly/daily/special stats
     def spamStats(self,p,replyto):
         period = p
         if p == "news": period = "day"
-        # if no games were played, don't report anything.
         # formatting awkwardness
         # do turns and points, or time.
-        stat1lst = [ "{turns} turns were played and {points} points were scored.",
-                      "{d} days, {h} hours, {m} minutes, and {s} seconds were spent playing NetHack." ]
+        stat1lst = [ "{turns} turns of NetHack were played and {points} points were scored.",
+                      "{d} days, {h} hours, {m} minutes, and {s} seconds were spent playing NetHack."
+                   ]
+        zapmStr = [ "{zgames} games of ZAPM were played, with {zascend} ascensions." ]
         stat2str = { "align"  : "alignment" } # use get() to leave unchanged if not here
         periodStr = { "hour" : ["It's %H o'clock on %A, %B %d (%Z), and this is your Hourly Update.", "In the last hour,"],
                       "day"  : ["It's now %A, %B %d, and this is your Daily Wrap-up.", "Over the past day,"],
                       "news" : ["It's %M minutes after %H o'clock on %A, %B %d (%Z), and this is a Special Bulletin.", "So far today,"]
                     }
+        self.updateZapmStats()
+        # don't report zapm unless something was played
+        if self.stats[period]["zgames"] > 0:
+            stat1lst += zapmStr
         # hourly, we report one of role/race/etc. Daily, and for news, we report them all
         if p == "hour":
             stat1lst = [random.choice(stat1lst)]
@@ -517,7 +547,7 @@ class DeathBotProtocol(irc.IRCClient):
         for c in chanlist:
             self.msgLog(c, "Greetings, Adventurers!")
             self.msgLog(c, time.strftime(periodStr[p][0]))
-            self.msgLog(c, periodStr[p][1] + " {games} games ended, with {ascend} ascensions.".format(**self.stats[period]))
+            self.msgLog(c, periodStr[p][1] + " {games} games of NetHack ended, with {ascend} ascensions.".format(**self.stats[period]))
             if self.stats[period]["games"] != 0:
                 for stat1 in stat1lst:
                     self.msgLog(c, stat1.format(**self.stats[period]))
@@ -526,7 +556,7 @@ class DeathBotProtocol(irc.IRCClient):
                     maxStat2 = dict(zip(["name","number"],max(self.stats[period][stat2].iteritems(), key=lambda x:x[1])))
                     # Expand the Rog->Rogue, Fem->Female, etc
                     maxStat2["name"] = dict(role.items() + race.items() + gender.items() + align.items()).get(maxStat2["name"],maxStat2["name"])
-                    self.msgLog(c, "The most popular " + stat2str.get(stat2,stat2) + " was {name} with {number} games.".format(**maxStat2))
+                    self.msgLog(c, "The most popular NetHack " + stat2str.get(stat2,stat2) + " was {name} with {number} games.".format(**maxStat2))
             self.msgLog(c, "There are {days} days, {hours} hours and {minutes} minutes left {prep} the ".format(**cd)
                                + YEAR + " Tournament")
             self.msgLog(c, "Let's be careful out there.")
@@ -534,7 +564,7 @@ class DeathBotProtocol(irc.IRCClient):
     def hourlyStats(self):
         nowtime = datetime.now()
         game_on =  (nowtime > self.ttime["start"]) and (nowtime < self.ttime["end"])
-        #if TEST: game_on = True
+        if TEST: game_on = True
         if not game_on: return
 
         if nowtime.hour == 0:
