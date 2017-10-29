@@ -286,9 +286,9 @@ class DeathBotProtocol(irc.IRCClient):
     xlogfiles = {filepath.FilePath("/var/www/hardfought.org/devnull/xlogfiles/xlogfile"): ("hardfought", "\t",
                                             "www.hardfought.org/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt"),
                  filepath.FilePath("/var/www/hardfought.org/devnull/xlogfiles/xlogfile-us-west"): ("altorg", "\t",
-                                            "http://54.183.3.254/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt"),
+                                            "e6.alt.org/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt"),
                  filepath.FilePath("/var/www/hardfought.org/devnull/xlogfiles/xlogfile-eu"): ("hdf-eu", "\t",
-                                            "https://eu.hardfought.org/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt")}
+                                            "eu.hardfought.org/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt")}
     # livelogs is actually just the challenge log at this point.
     livelogs  = {filepath.FilePath("/var/www/hardfought.org/challenge/dn36_log"): ("", ":")}
     # ZAPM logfiles 
@@ -301,16 +301,12 @@ class DeathBotProtocol(irc.IRCClient):
         xlogfiles = {filepath.FilePath("xlogfile.hdf"): ("hardfought", "\t",
                                             "www.hardfought.org/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt"),
                  filepath.FilePath("xlogfile.nao"): ("altorg", "\t",
-                                            "http://54.183.3.254/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt"),
+                                            "e6.alt.org/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt"),
                  filepath.FilePath("xlogfile.eu"): ("hdf-eu", "\t",
-                                            "https://eu.hardfought.org/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt")}
+                                            "eu.hardfought.org/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt")}
         # livelogs is actually just the challenge log at this point.
         livelogs  = {filepath.FilePath("dn36_log"): ("", ":")}
 
-    # Forward events to other bots at the request of maintainers of other variant-specific channels
-    #forwards = {"hardfought" : [],
-    #            "slashem" : []}
-    # Stats for hourly/daily spam
 
     looping_calls = None
     commands = {}
