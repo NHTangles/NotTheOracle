@@ -423,6 +423,9 @@ class DeathBotProtocol(irc.IRCClient):
         self.looping_calls["trophy"].start(60)
         # Call it now to seed the trophy dict.
         self.reportTrophies()
+        # Looping call for reporting zapm
+        self.looping_calls["zapm"] = task.LoopingCall(self.reportZapm)
+        self.looping_calls["zapm"].start(30)
 
 
     def tweet(self, message):
@@ -488,12 +491,14 @@ class DeathBotProtocol(irc.IRCClient):
 #            self.msgLog(replyto, sender + ": " + message)
             self.msgLog(replyto, message)
 
-    def updateZapmStats(self):
+    def reportZapm(self):
         for filepath in self.zlogfiles:
             with filepath.open("r") as handle:
                 handle.seek(self.logs_seek[filepath])
                 for line in handle:
                     print line
+                    zwords = line.split()
+                    self.announce("ZAPM: " + " ".join(zwords[5:]) + " [{0} points]".format(zwords[2]))
                     for period in self.stats:
                         if line.find("Activated the Bizarro Orgasmatron") != -1:
                             self.stats[period]["zascend"] += 1
@@ -515,7 +520,6 @@ class DeathBotProtocol(irc.IRCClient):
                       "day"  : ["It's now %A, %B %d, and this is your Daily Wrap-up.", "Over the past day,"],
                       "news" : ["It's %M minutes after %H o'clock on %A, %B %d (%Z), and this is a Special Bulletin.", "So far today,"]
                     }
-        self.updateZapmStats()
         # don't report zapm unless something was played
         if self.stats[period]["zgames"] > 0:
             stat1lst += zapmStr
