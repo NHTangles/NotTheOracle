@@ -565,7 +565,7 @@ class DeathBotProtocol(irc.IRCClient):
     def startCountdown(event,time):
         self.announce("The tournament {event}s in {0}...".format(time),True)
         for delay in range (1,time):
-            reactor.callLater(delay,self.announce("{0}...".format(time-delay),True)
+            reactor.callLater(delay,self.announce,"{0}...".format(time-delay),True)
         
 
     def hourlyStats(self):
@@ -577,11 +577,11 @@ class DeathBotProtocol(irc.IRCClient):
             self.announce("###### THE {0} DEVNULL TRIBUTE TOURNAMENT IS OPEN! ######".format(YEAR))
         elif abs(nowtime - self.ttime["end"]) < timedelta(minutes=1):
             self.announce("###### THE {0} DEVNULL TRIBUTE TOURNAMENT IS CLOSED! ######".format(YEAR))
-        elif abs(nowtime + timedelta(hours=1) - self.ttime["start"]:
+        elif abs(nowtime + timedelta(hours=1) - self.ttime["start"]):
             reactor.callLater(3597, self.startCountdown,"start",3) # 3 seconds to the next hour
-        elif abs(nowtime + timedelta(hours=1) - self.ttime["end"]:
+        elif abs(nowtime + timedelta(hours=1) - self.ttime["end"]):
             reactor.callLater(3597, self.startCountdown,"end",3) # 3 seconds to the next hour
-        game_on =  (nowtime >= self.ttime["start"]) and (nowtime =< self.ttime["end"])
+        game_on =  (nowtime > self.ttime["start"]) and (nowtime < self.ttime["end"])
         #if TEST: game_on = True
         if not game_on: return
 
