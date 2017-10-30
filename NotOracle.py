@@ -83,8 +83,6 @@ if TEST:
     TWIT = False
 CHANNELS = EVENTCHANNELS + SPAMCHANNELS
 NOTIFY_PROXY = "Beholder" # just use Beholder's !tell for &notify
-FILEROOT="/opt/nethack/hardfought.org/"
-WEBROOT="https://www.hardfought.org/"
 LOGROOT="/var/www/hardfought.org/irclog.dn/"
 TROPHIES="/home/mandevil/trophies.json"
 if TEST: TROPHIES="trophies.json"
@@ -221,12 +219,6 @@ def parse_challenge_line(line,delim):
     record = dict(zip(["time","challenge","player","action"],line.strip().split(":")))
     return record
 
-#def xlogfile_entries(fp):
-#    if fp is None: return
-#    with fp.open("rt") as handle:
-#        for line in handle:
-#            yield parse_xlogfile_line(line)
-
 class DeathBotProtocol(irc.IRCClient):
     nickname = NICK
     username = "NotTheOracle"
@@ -240,23 +232,17 @@ class DeathBotProtocol(irc.IRCClient):
     if TEST: password = "NotTHEPassword"
     if TWIT:
        try:
-           #gibberish_that_makes_twitter_work = open(".twitter_oauth","r").read().strip().split("\n")
            gibberish_that_makes_twitter_work = open("/opt/NotOracle/.twitter_oauth","r").read().strip().split("\n")
            twit = Twitter(auth=OAuth(*gibberish_that_makes_twitter_work))
        except:
            TWIT = False
 
-#    sourceURL = "https://github.com/NHTangles/beholder"
     versionName = "NotOracle.py"
     versionNum = "0.1"
 
-    dump_url_prefix = "https://" # WEBROOT + "userdata/{name[0]}/{name}/"
-    dump_file_prefix = FILEROOT + "dgldir/userdata/{name[0]}/{name}/"
+    dump_url_prefix = "https://"
 
     scoresURL = "https://www.hardfought.org/devnull"
-#    if TEST: scoresURL = "https://voyager.lupomesky.cz/dnt/test.html"
-#    rceditURL = WEBROOT + "nethack/rcedit"
-#    helpURL = WEBROOT + "nethack"
     # devnull tournament runs on hollywood time
     os.environ["TZ"] = ":US/Pacific"
     ttime = { "start": datetime(int(YEAR),11,01,00,00,00),
@@ -281,7 +267,6 @@ class DeathBotProtocol(irc.IRCClient):
             chanLog[c] = None
         if chanLog[c]: os.chmod(chanLogName[c],stat.S_IRUSR|stat.S_IWUSR|stat.S_IRGRP|stat.S_IROTH)
 
-    # This will need some work.  Dumplog paths for remote servers.
     # something else will have to retrieve the xlogfiles and place them locally
     xlogfiles = {filepath.FilePath("/var/www/hardfought.org/devnull/xlogfiles/xlogfile"): ("hardfought", "\t",
                                             "www.hardfought.org/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt"),
@@ -338,6 +323,7 @@ class DeathBotProtocol(irc.IRCClient):
 
         self.logs_seek = {}
         self.looping_calls = {}
+        self.file_retries = 0
 
         #stats for hourly/daily spam
         self.stats = {}
@@ -400,8 +386,19 @@ class DeathBotProtocol(irc.IRCClient):
                     game = self.logs[filepath][4](line, delim)
                     game["server"] = self.logs[filepath][1]
                     game["dumpfmt"] = self.logs[filepath][3]
-                    for line in self.logs[filepath][0](game,False):
-                        pass
+                    try:
+                        for subline in self.logs[filepath][0](game,False):
+                            pass
+                    except:
+                        print "xlog on startup: bad line: " + line
+                        self.file_retries += 1
+                        if self.file_retries < 20:
+                            # try again from beginning of this line
+                            handle.seek(self.logs_seek[filepath])
+                        else:
+                            # retries exceeded - give up and resume from EOF.
+                            self.file_retries = 0
+                            handle.seek(0, 2)
                 self.logs_seek[filepath] = handle.tell()
 
         # poll logs for updates every 3 seconds
@@ -826,11 +823,9 @@ class DeathBotProtocol(irc.IRCClient):
 
         dumplog = game.get("dumplog",False)
         # Need to figure out the dump path before messing with the name below
-        dumpfile = (self.dump_file_prefix + game["dumpfmt"]).format(**game)
-#        if TEST or os.path.exists(dumpfile): # dump files may not exist on test system
-            # quote only the game-specific part, not the prefix.
-            # Otherwise it quotes the : in https://
-            # assume the rest of the url prefix is safe.
+        # quote only the game-specific part, not the prefix.
+        # Otherwise it quotes the : in https://
+        # assume the rest of the url prefix is safe.
         dumpurl = urllib.quote(game["dumpfmt"].format(**game))
         dumpurl = self.dump_url_prefix.format(**game) + dumpurl
         self.lg[lname] = dumpurl
@@ -902,8 +897,16 @@ class DeathBotProtocol(irc.IRCClient):
                         self.announce(subline)
                 except:
                     print "LogReport: Bad line: " + line
-
+                    self.file_retries += 1
+                    if self.file_retries < 5:
+                        return # without updating logs_seek.
+                        # we will try again from beginning of this line
+                    else:
+                        # retries exceeded - give up and resume from EOF.
+                        self.file_retries = 0
+                        handle.seek(0,2)
             self.logs_seek[filepath] = handle.tell()
+
 
     def connectionLost(self, reason=None):
         if self.looping_calls is None: return
