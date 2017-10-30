@@ -463,10 +463,14 @@ class DeathBotProtocol(irc.IRCClient):
             self.log(replyto, "<" + self.nickname + "> " + message)
         self.msg(replyto, message)
 
-    def announce(self, message):
-        for c in CHANNELS:
+    def announce(self, message, spam = False):
+        chanlist = CHANNELS
+        if spam:
+            chanlist = SPAMCHANNELS #only
+        else: # only tweet non spam
+            self.tweet(message)
+        for c in chanlist:
             self.msgLog(c, message)
-        self.tweet(message)
 
     # Similar wrapper for describe
     def describeLog(self, replyto, message):
@@ -558,10 +562,27 @@ class DeathBotProtocol(irc.IRCClient):
                                + YEAR + " Tournament")
             self.msgLog(c, "Let's be careful out there.")
 
+    def startCountdown(event,time):
+        self.announce("The tournament {event}s in {0}...".format(time),True)
+        for delay in range (1,time):
+            reactor.callLater(delay,self.announce("{0}...".format(time-delay),True)
+        
+
     def hourlyStats(self):
         nowtime = datetime.now()
-        game_on =  (nowtime > self.ttime["start"]) and (nowtime < self.ttime["end"])
-        if TEST: game_on = True
+        # special case handling for start/end
+        # we are running at the top of the hour
+        # so checking we are within 1 minute of start/end time is sufficient
+        if abs(nowtime - self.ttime["start"]) < timedelta(minutes=1):
+            self.announce("###### THE {0} DEVNULL TRIBUTE TOURNAMENT IS OPEN! ######".format(YEAR))
+        elif abs(nowtime - self.ttime["end"]) < timedelta(minutes=1):
+            self.announce("###### THE {0} DEVNULL TRIBUTE TOURNAMENT IS CLOSED! ######".format(YEAR))
+        elif abs(nowtime + timedelta(hours=1) - self.ttime["start"]:
+            reactor.callLater(3597, self.startCountdown,"start",3) # 3 seconds to the next hour
+        elif abs(nowtime + timedelta(hours=1) - self.ttime["end"]:
+            reactor.callLater(3597, self.startCountdown,"end",3) # 3 seconds to the next hour
+        game_on =  (nowtime >= self.ttime["start"]) and (nowtime =< self.ttime["end"])
+        #if TEST: game_on = True
         if not game_on: return
 
         if nowtime.hour == 0:
