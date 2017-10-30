@@ -897,8 +897,11 @@ class DeathBotProtocol(irc.IRCClient):
                 game = self.logs[filepath][4](line, delim)
                 if self.logs[filepath][1]: game["server"] = self.logs[filepath][1]
                 if self.logs[filepath][3]: game["dumpfmt"] = self.logs[filepath][3]
-                for line in self.logs[filepath][0](game):
-                    self.announce(line)
+                try:
+                    for subline in self.logs[filepath][0](game):
+                        self.announce(subline)
+                except:
+                    print "LogReport: Bad line: " + line
 
             self.logs_seek[filepath] = handle.tell()
 
