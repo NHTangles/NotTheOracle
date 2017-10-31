@@ -248,10 +248,13 @@ class DeathBotProtocol(irc.IRCClient):
     ttime = { "start": datetime(int(YEAR),11,01,00,00,00),
               "end"  : datetime(int(YEAR),12,01,00,00,00)
             }
+    if TEST: ttime = { "start": datetime(int(YEAR),10,31,07,00,00),
+              "end"  : datetime(int(YEAR),12,01,00,00,00)
+            }
     servers = [ ("hardfought", "ssh nethack@hardfought.org   ", "US East"),
                 ("altorg    ", "ssh nethack@e6.alt.org       ", "NAO Sponsored - US West"),
                 ("hdf-eu    ", "ssh nethack@eu.hardfought.org", "EU (London)"),
-                ("hdf-au    ", "coming maybe :)              ", "AU (Sydney)"),
+                ("hdf-au    ", "ssh nethack@au.hardfought.org", "AU (Sydney)"),
               ]
 
     logday = time.strftime("%d")
@@ -273,7 +276,9 @@ class DeathBotProtocol(irc.IRCClient):
                  filepath.FilePath("/var/www/hardfought.org/devnull/xlogfiles/xlogfile-us-west"): ("altorg", "\t",
                                             "e6.alt.org/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt"),
                  filepath.FilePath("/var/www/hardfought.org/devnull/xlogfiles/xlogfile-eu"): ("hdf-eu", "\t",
-                                            "eu.hardfought.org/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt")}
+                                            "eu.hardfought.org/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt"),
+                 filepath.FilePath("/var/www/hardfought.org/devnull/xlogfiles/xlogfile-au"): ("hdf-eu", "\t",
+                                            "au.hardfought.org/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt")}
     # livelogs is actually just the challenge log at this point.
     livelogs  = {filepath.FilePath("/var/www/hardfought.org/challenge/dn36_log"): ("", ":")}
     # ZAPM logfiles 
@@ -548,6 +553,10 @@ class DeathBotProtocol(irc.IRCClient):
         for c in chanlist:
             self.msgLog(c, "Greetings, Adventurers!")
             self.msgLog(c, time.strftime(periodStr[p][0]))
+            # for hourly, if it's slow report "hourly update" above, but give "so far today" stats below
+            if p == "hour" and self.stats[p] < 10:
+                p = "news"
+                period = "day"
             self.msgLog(c, periodStr[p][1] + " {games} games of NetHack ended, with {ascend} ascensions.".format(**self.stats[period]))
             if self.stats[period]["games"] != 0:
                 for stat1 in stat1lst:
@@ -562,11 +571,13 @@ class DeathBotProtocol(irc.IRCClient):
                                + YEAR + " Tournament")
             self.msgLog(c, "Let's be careful out there.")
 
-    def startCountdown(event,time):
-        self.announce("The tournament {event}s in {0}...".format(time),True)
+    def startCountdown(self,event,time):
+        self.announce("The tournament {0}s in {1}...".format(event,time),True)
         for delay in range (1,time):
             reactor.callLater(delay,self.announce,"{0}...".format(time-delay),True)
-        
+
+#    def testCountdown(self, sender, replyto, msgwords):
+#        self.startCountdown(msgwords[1],int(msgwords[2]))
 
     def hourlyStats(self):
         nowtime = datetime.now()
