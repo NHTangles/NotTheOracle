@@ -248,9 +248,6 @@ class DeathBotProtocol(irc.IRCClient):
     ttime = { "start": datetime(int(YEAR),11,01,00,00,00),
               "end"  : datetime(int(YEAR),12,01,00,00,00)
             }
-    if TEST: ttime = { "start": datetime(int(YEAR),10,31,07,00,00),
-              "end"  : datetime(int(YEAR),12,01,00,00,00)
-            }
     servers = [ ("hardfought", "ssh nethack@hardfought.org   ", "US East"),
                 ("altorg    ", "ssh nethack@e6.alt.org       ", "NAO Sponsored - US West"),
                 ("hdf-eu    ", "ssh nethack@eu.hardfought.org", "EU (London)"),
@@ -391,19 +388,13 @@ class DeathBotProtocol(irc.IRCClient):
                     game = self.logs[filepath][4](line, delim)
                     game["server"] = self.logs[filepath][1]
                     game["dumpfmt"] = self.logs[filepath][3]
-                    try:
-                        for subline in self.logs[filepath][0](game,False):
-                            pass
-                    except:
-                        print "xlog on startup: bad line: " + line
-                        self.file_retries += 1
-                        if self.file_retries < 20:
-                            # try again from beginning of this line
-                            handle.seek(self.logs_seek[filepath])
-                        else:
-                            # retries exceeded - give up and resume from EOF.
-                            self.file_retries = 0
-                            handle.seek(0, 2)
+                    #try:
+                    for subline in self.logs[filepath][0](game,False):
+                        pass
+                    #except:
+                    #    print "xlog on startup: bad line: " + line
+                    #    # retries exceeded - give up and resume from EOF.
+                    #    handle.seek(0, 2)
                 self.logs_seek[filepath] = handle.tell()
 
         # poll logs for updates every 3 seconds
@@ -646,11 +637,11 @@ class DeathBotProtocol(irc.IRCClient):
         return rv
 
     def reportTrophies(self):
-        try:
-            ntrophies = json.loads(open(TROPHIES).read())
-        except:
-            print "Failed to read trophies file: " + TROPHIES
-            return
+        #try:
+        ntrophies = json.loads(open(TROPHIES).read())
+        #except:
+        #    print "Failed to read trophies file: " + TROPHIES
+        #    return
         if self.trophies == {}:
             # bot probably restarted
             self.trophies = ntrophies
@@ -884,17 +875,26 @@ class DeathBotProtocol(irc.IRCClient):
         else:
             game["ascsuff"] = ""
 
-        if (not report): return # we're just reading through old entries at startup
-        # collect hourly/daily stats for games that actually ended now(ish)
+        # collect hourly/daily stats for games that actually ended within the period
+        etime = fromtimestamp_int(game["endtime"])
+        ntime = datetime.now()
+        et = {}
+        nt = {}
+        et["hour"] = datetime(etime.year,etime.month,etime.day,etime.hour)
+        et["day"] = datetime(etime.year,etime.month,etime.day)
+        nt["hour"] = datetime(ntime.year,ntime.month,ntime.day,ntime.hour)
+        nt["day"] = datetime(ntime.year,ntime.month,ntime.day)
         for period in ["hour","day"]:
-            self.stats[period]["games"] += 1
-            for tp in ["turns","points","realtime"]:
-                self.stats[period][tp] += game[tp]
-            for rrga in ["role","race","gender","align"]:
-                self.stats[period][rrga][game[rrga]] = self.stats[period][rrga].get(game[rrga],0) + 1
-            if game["death"] == "ascended":
-                self.stats[period]["ascend"] += 1
+            if et[period] == nt[period]:
+                self.stats[period]["games"] += 1
+                for tp in ["turns","points","realtime"]:
+                    self.stats[period][tp] += game[tp]
+                for rrga in ["role","race","gender","align"]:
+                    self.stats[period][rrga][game[rrga]] = self.stats[period][rrga].get(game[rrga],0) + 1
+                if game["death"] == "ascended":
+                    self.stats[period]["ascend"] += 1
 
+        if (not report): return # we're just reading through old entries at startup
         # start of actual reporting
         if game.get("while", False) and game["while"] != "":
             game["death"] += (", while " + game["while"])
