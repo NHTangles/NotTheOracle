@@ -274,7 +274,7 @@ class DeathBotProtocol(irc.IRCClient):
                                             "e6.alt.org/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt"),
                  filepath.FilePath("/var/www/hardfought.org/devnull/xlogfiles/xlogfile-eu"): ("hdf-eu", "\t",
                                             "eu.hardfought.org/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt"),
-                 filepath.FilePath("/var/www/hardfought.org/devnull/xlogfiles/xlogfile-au"): ("hdf-eu", "\t",
+                 filepath.FilePath("/var/www/hardfought.org/devnull/xlogfiles/xlogfile-au"): ("hdf-au", "\t",
                                             "au.hardfought.org/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt")}
     # livelogs is actually just the challenge log at this point.
     livelogs  = {filepath.FilePath("/var/www/hardfought.org/challenge/dn36_log"): ("", ":")}
