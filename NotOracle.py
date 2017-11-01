@@ -388,13 +388,8 @@ class DeathBotProtocol(irc.IRCClient):
                     game = self.logs[filepath][4](line, delim)
                     game["server"] = self.logs[filepath][1]
                     game["dumpfmt"] = self.logs[filepath][3]
-                    #try:
                     for subline in self.logs[filepath][0](game,False):
                         pass
-                    #except:
-                    #    print "xlog on startup: bad line: " + line
-                    #    # retries exceeded - give up and resume from EOF.
-                    #    handle.seek(0, 2)
                 self.logs_seek[filepath] = handle.tell()
 
         # poll logs for updates every 3 seconds
@@ -418,7 +413,11 @@ class DeathBotProtocol(irc.IRCClient):
 
 
     def tweet(self, message):
-        if TWIT: self.twit.statuses.update(status=message)
+        if TWIT:
+            try:
+                self.twit.statuses.update(status=message)
+            except:
+                print "Bad tweet: " + message
 
     def nickCheck(self):
         # also rejoin the channel here, in case we drop off for any reason
@@ -545,7 +544,7 @@ class DeathBotProtocol(irc.IRCClient):
             self.msgLog(c, "Greetings, Adventurers!")
             self.msgLog(c, time.strftime(periodStr[p][0]))
             # for hourly, if it's slow report "hourly update" above, but give "so far today" stats below
-            if p == "hour" and self.stats[p] < 10:
+            if p == "hour" and self.stats[p]["games"] < 10:
                 p = "news"
                 period = "day"
             self.msgLog(c, periodStr[p][1] + " {games} games of NetHack ended, with {ascend} ascensions.".format(**self.stats[period]))
@@ -924,19 +923,19 @@ class DeathBotProtocol(irc.IRCClient):
                 game = self.logs[filepath][4](line, delim)
                 if self.logs[filepath][1]: game["server"] = self.logs[filepath][1]
                 if self.logs[filepath][3]: game["dumpfmt"] = self.logs[filepath][3]
-                try:
-                    for subline in self.logs[filepath][0](game):
-                        self.announce(subline)
-                except:
-                    print "LogReport: Bad line: " + line
-                    self.file_retries += 1
-                    if self.file_retries < 5:
-                        return # without updating logs_seek.
+                #try:
+                for subline in self.logs[filepath][0](game):
+                    self.announce(subline)
+                #except:
+                #    print "LogReport: Bad line: " + line
+                #    self.file_retries += 1
+                #    if self.file_retries < 5:
+                #        return # without updating logs_seek.
                         # we will try again from beginning of this line
-                    else:
+                #    else:
                         # retries exceeded - give up and resume from EOF.
-                        self.file_retries = 0
-                        handle.seek(0,2)
+                #        self.file_retries = 0
+                #        handle.seek(0,2)
             self.logs_seek[filepath] = handle.tell()
 
 
