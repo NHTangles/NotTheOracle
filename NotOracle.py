@@ -307,6 +307,7 @@ class DeathBotProtocol(irc.IRCClient):
                                 "turns"   : 0,
                                 "realtime": 0,
                                 "games"   : 0,
+                                "scum"    : 0,
                                 "ascend"  : 0,
                                 "zgames"  : 0,
                                 "zascend" : 0
@@ -544,10 +545,10 @@ class DeathBotProtocol(irc.IRCClient):
             self.msgLog(c, "Greetings, Adventurers!")
             self.msgLog(c, time.strftime(periodStr[p][0]))
             # for hourly, if it's slow report "hourly update" above, but give "so far today" stats below
-            if p == "hour" and self.stats[p]["games"] < 10:
+            if p == "hour" and (self.stats[p]["games"] - self.stats[p]["scum"] < 10):
                 p = "news"
                 period = "day"
-            self.msgLog(c, periodStr[p][1] + " {games} games of NetHack ended, with {ascend} ascensions.".format(**self.stats[period]))
+            self.msgLog(c, periodStr[p][1] + " {games} games of NetHack ended, with {ascend} ascensions, and {scum} start-scums.".format(**self.stats[period]))
             if self.stats[period]["games"] != 0:
                 for stat1 in stat1lst:
                     self.msgLog(c, stat1.format(**self.stats[period]))
@@ -838,7 +839,30 @@ class DeathBotProtocol(irc.IRCClient):
         return game["death"] in ("quit", "escaped") and game["points"] < 1000
 
     def xlogfileReport(self, game, report = True):
-        if self.startscummed(game): return
+
+        scumbag = self.startscummed(game)
+
+        # collect hourly/daily stats for games that actually ended within the period
+        etime = fromtimestamp_int(game["endtime"])
+        ntime = datetime.now()
+        et = {}
+        nt = {}
+        et["hour"] = datetime(etime.year,etime.month,etime.day,etime.hour)
+        et["day"] = datetime(etime.year,etime.month,etime.day)
+        nt["hour"] = datetime(ntime.year,ntime.month,ntime.day,ntime.hour)
+        nt["day"] = datetime(ntime.year,ntime.month,ntime.day)
+        for period in ["hour","day"]:
+            if et[period] == nt[period]:
+                self.stats[period]["games"] += 1
+                if scumbag: self.stats[period]["scum"] += 1
+                for tp in ["turns","points","realtime"]:
+                    self.stats[period][tp] += game[tp]
+                for rrga in ["role","race","gender","align"]:
+                    self.stats[period][rrga][game[rrga]] = self.stats[period][rrga].get(game[rrga],0) + 1
+                if game["death"] == "ascended":
+                    self.stats[period]["ascend"] += 1
+
+        if scumbag: return
 
         lname = game["name"].lower()
         var = game["server"].lower() # var is server, formerly variant.
@@ -873,25 +897,6 @@ class DeathBotProtocol(irc.IRCClient):
                 self.tlastasc = game["endtime"]
         else:
             game["ascsuff"] = ""
-
-        # collect hourly/daily stats for games that actually ended within the period
-        etime = fromtimestamp_int(game["endtime"])
-        ntime = datetime.now()
-        et = {}
-        nt = {}
-        et["hour"] = datetime(etime.year,etime.month,etime.day,etime.hour)
-        et["day"] = datetime(etime.year,etime.month,etime.day)
-        nt["hour"] = datetime(ntime.year,ntime.month,ntime.day,ntime.hour)
-        nt["day"] = datetime(ntime.year,ntime.month,ntime.day)
-        for period in ["hour","day"]:
-            if et[period] == nt[period]:
-                self.stats[period]["games"] += 1
-                for tp in ["turns","points","realtime"]:
-                    self.stats[period][tp] += game[tp]
-                for rrga in ["role","race","gender","align"]:
-                    self.stats[period][rrga][game[rrga]] = self.stats[period][rrga].get(game[rrga],0) + 1
-                if game["death"] == "ascended":
-                    self.stats[period]["ascend"] += 1
 
         if (not report): return # we're just reading through old entries at startup
         # start of actual reporting
