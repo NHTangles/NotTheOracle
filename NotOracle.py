@@ -523,17 +523,6 @@ class DeathBotProtocol(irc.IRCClient):
             stat2lst = [random.choice(["role"] * 5 + ["race"] * 3 + ["align"] * 2 + ["gender"])]
         else:
             stat2lst = ["role", "race", "align", "gender"]
-        if self.stats[period]["games"] != 0:
-            # mash the realtime value into d,h,m,s
-            rt = int(self.stats[period]["realtime"])
-            self.stats[period]["s"] = int(rt%60)
-            rt /= 60
-            self.stats[period]["m"] = int(rt%60)
-            rt /= 60
-            self.stats[period]["h"] = int(rt%24)
-            rt /= 24
-            self.stats[period]["d"] = int(rt)
-
         cd = self.countDown()
         if cd["event"] == "start": cd["prep"] = "until"
         else: cd["prep"] = "in"
@@ -548,6 +537,17 @@ class DeathBotProtocol(irc.IRCClient):
             if p == "hour" and (self.stats[p]["games"] - self.stats[p]["scum"] < 10):
                 p = "news"
                 period = "day"
+            if self.stats[period]["games"] != 0:
+                # mash the realtime value into d,h,m,s
+                rt = int(self.stats[period]["realtime"])
+                self.stats[period]["s"] = int(rt%60)
+                rt /= 60
+                self.stats[period]["m"] = int(rt%60)
+                rt /= 60
+                self.stats[period]["h"] = int(rt%24)
+                rt /= 24
+                self.stats[period]["d"] = int(rt)
+
             self.msgLog(c, periodStr[p][1] + " {games} games of NetHack ended, with {ascend} ascensions, and {scum} start-scums.".format(**self.stats[period]))
             if self.stats[period]["games"] != 0:
                 for stat1 in stat1lst:
