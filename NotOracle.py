@@ -332,6 +332,7 @@ class DeathBotProtocol(irc.IRCClient):
         self.stats = {}
         self.initStats("hour")
         self.initStats("day")
+        self.initStats("full")
         # trophies...
         self.trophies = {}
         # work out how much hour is left
@@ -514,6 +515,7 @@ class DeathBotProtocol(irc.IRCClient):
         periodStr = { "hour" : ["It's %H o'clock on %A, %B %d (%Z), and this is your Hourly Update.", "In the last hour,"],
                       "day"  : ["It's now %A, %B %d, and this is your Daily Wrap-up.", "Over the past day,"],
                       "news" : ["It's %M minutes after %H o'clock on %A, %B %d (%Z), and this is a Special Bulletin.", "So far today,"]
+                      "full" : ["The tournament is now over, and this is the final wrap.", "Over the tournament,"]
                     }
         # don't report zapm unless something was played
         if self.stats[period]["zgames"] > 0:
@@ -560,9 +562,13 @@ class DeathBotProtocol(irc.IRCClient):
                     # Expand the Rog->Rogue, Fem->Female, etc
                     maxStat2["name"] = dict(role.items() + race.items() + gender.items() + align.items()).get(maxStat2["name"],maxStat2["name"])
                     self.msgLog(c, "The most popular NetHack " + stat2str.get(stat2,stat2) + " was {name} with {number} games.".format(**maxStat2))
-            self.msgLog(c, "There are {days} days, {hours} hours and {minutes} minutes left {prep} the ".format(**cd)
+            if p == "full":
+                self.msgLog(c, "We hope you enjoyed the /dev/null/tribute tournament.")
+                self.msgLog(c, "Thankyou for playing.")
+            else:
+                self.msgLog(c, "There are {days} days, {hours} hours and {minutes} minutes left {prep} the ".format(**cd)
                                + YEAR + " Tournament")
-            self.msgLog(c, "Let's be careful out there.")
+                self.msgLog(c, "Let's be careful out there.")
 
     def startCountdown(self,event,time):
         self.announce("The tournament {0}s in {1}...".format(event,time),True)
@@ -581,6 +587,8 @@ class DeathBotProtocol(irc.IRCClient):
             self.announce("###### THE {0} DEVNULL TRIBUTE TOURNAMENT IS OPEN! ######".format(YEAR))
         elif abs(nowtime - self.ttime["end"]) < timedelta(minutes=1):
             self.announce("###### THE {0} DEVNULL TRIBUTE TOURNAMENT IS CLOSED! ######".format(YEAR))
+            self.spamStats("full",None)
+            return
         elif abs(nowtime + timedelta(hours=1) - self.ttime["start"]) < timedelta(minutes=1):
             reactor.callLater(3597, self.startCountdown,"start",3) # 3 seconds to the next hour
         elif abs(nowtime + timedelta(hours=1) - self.ttime["end"]) < timedelta(minutes=1):
@@ -853,8 +861,8 @@ class DeathBotProtocol(irc.IRCClient):
         et["day"] = datetime(etime.year,etime.month,etime.day)
         nt["hour"] = datetime(ntime.year,ntime.month,ntime.day,ntime.hour)
         nt["day"] = datetime(ntime.year,ntime.month,ntime.day)
-        for period in ["hour","day"]:
-            if et[period] == nt[period]:
+        for period in ["hour","day","full"]:
+            if period == "full" or et[period] == nt[period]:
                 self.stats[period]["games"] += 1
                 if scumbag: self.stats[period]["scum"] += 1
                 for tp in ["turns","points","realtime"]:
