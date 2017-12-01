@@ -514,7 +514,7 @@ class DeathBotProtocol(irc.IRCClient):
         stat2str = { "align"  : "alignment" } # use get() to leave unchanged if not here
         periodStr = { "hour" : ["It's %H o'clock on %A, %B %d (%Z), and this is your Hourly Update.", "In the last hour,"],
                       "day"  : ["It's now %A, %B %d, and this is your Daily Wrap-up.", "Over the past day,"],
-                      "news" : ["It's %M minutes after %H o'clock on %A, %B %d (%Z), and this is a Special Bulletin.", "So far today,"]
+                      "news" : ["It's %M minutes after %H o'clock on %A, %B %d (%Z), and this is a Special Bulletin.", "So far today,"],
                       "full" : ["The tournament is now over, and this is the final wrap.", "Over the tournament,"]
                     }
         # don't report zapm unless something was played
