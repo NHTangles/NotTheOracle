@@ -278,7 +278,7 @@ class DeathBotProtocol(irc.IRCClient):
                                             "au.hardfought.org/userdata/{name[0]}/{name}/dn36/dumplog/{starttime}.dn36.txt")}
     # livelogs is actually just the challenge log at this point.
     livelogs  = {filepath.FilePath("/var/www/hardfought.org/challenge/dn36_log"): ("", ":")}
-    # ZAPM logfiles 
+    # ZAPM logfiles
     zlogfiles = [filepath.FilePath("/var/www/hardfought.org/challenge/zlogfile"),
                  filepath.FilePath("/var/www/hardfought.org/challenge/zlogfile-eu"),
                  filepath.FilePath("/var/www/hardfought.org/challenge/zlogfile-us-west")
@@ -489,9 +489,11 @@ class DeathBotProtocol(irc.IRCClient):
             with filepath.open("r") as handle:
                 handle.seek(self.logs_seek[filepath])
                 for line in handle:
-                    print line
                     zwords = line.split()
-                    self.announce("ZAPM: " + " ".join(zwords[5:]) + " [{0} points]".format(zwords[2]))
+                    if int(zwords[2]) == 0 or int(zwords[2]) < 1000 and ("Quit" in zwords or "suicide" in zwords):
+                        print "ZAPM scum: " + line
+                    else:
+                        self.announce("ZAPM: " + " ".join(zwords[5:]) + " [{0} points]".format(zwords[2]))
                     for period in self.stats:
                         if line.find("Activated the Bizarro Orgasmatron") != -1:
                             self.stats[period]["zascend"] += 1
@@ -836,7 +838,7 @@ class DeathBotProtocol(irc.IRCClient):
 
     ### Xlog/challenge event processing
     def startscummed(self, game):
-        return game["death"] in ("quit", "escaped") and game["points"] < 1000
+        return game["death"] in ("quit", "Quit", "escaped") and game["points"] < 1000
 
     def xlogfileReport(self, game, report = True):
 
